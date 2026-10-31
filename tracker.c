@@ -233,7 +233,20 @@ void handle_updatetracker_req(int sock_child, updateReq tokens){
 
 	if(file_exists(fileName)){
 
-		//todo
+		if(file_exists(fileName)){
+
+		FILE *file = fopen(fileName,"w");
+
+		if (file == NULL) {
+			perror("Error opening or creating the file!");
+		}
+
+		time_t now = time(NULL);
+
+		char key[64];
+		snprintf(key, sizeof(key), "%s:%d", tokens.ip, tokens.port);
+
+	}
 
 	}
 }
