@@ -5,16 +5,20 @@
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include "definitions.h"
 
 
 main(int argc,char *argv[]){
 	
-   	char server_address[50];
+   	char *server_address = "127.0.0.1";
 	int server_port=3490;  // you should instead read from configuration file
     
    
 	struct sockaddr_in server_addr;
 	int sockid;
+
+	char msg[256];
         
 	if ((sockid = socket(AF_INET,SOCK_STREAM,0))==-1){//create socket
 		printf("socket cannot be created\n"); exit(0);
