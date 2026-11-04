@@ -9,10 +9,10 @@
 #include "definitions.h"
 
 
-main(int argc,char *argv[]){
+void main(int argc,char *argv[]){
 	
    	char *server_address = "127.0.0.1";
-	int server_port=3490;  // you should instead read from configuration file
+	int server_port=5000;  // you should instead read from configuration file
     
    
 	struct sockaddr_in server_addr;
@@ -33,21 +33,25 @@ main(int argc,char *argv[]){
 
    /* If connected successfully*/
     
-	if(!strcmp(argv[1],"list")){// if this is LIST command
-		int list_req=htons(LIST);
-		if((write(sockid,(char *)&list_req,sizeof(list_req))) < 0){//inform the server of the list request
+	if(1){// if this is LIST command
+		// I changed this to 1 for now so that its always true for testing purposes. I will later handle running this block with proper timing
+		const char* list_req="REQ LIST";
+		if((write(sockid,list_req,strlen(list_req))) < 0){//inform the server of the list request
 			printf("Send_request  failure\n"); exit(0);
 		}
-
-        if((read(sockid,(char *)&msg,sizeof(msg)))< 0){// read what server has said
+		
+		int n; //store length of read data
+        if((n = read(sockid,(char *)&msg,sizeof(msg)))< 0){// read what server has said
 			printf("Read  failure\n"); exit(0); 
 		}
+
+		msg[n] = '\0'; //append null terminator to read message
+    	printf("%s\n", msg);
 		
 		close(sockid);
 		printf("Connection closed\n");
 	    exit(0);
 	}//end close
 
-    
 }	     
   

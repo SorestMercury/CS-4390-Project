@@ -64,22 +64,24 @@ int peer_handler(int sock_child){ // function for file transfer. child process w
 	char fname[64];
 	length=read(sock_child,read_msg,MAXLINE);			
 	read_msg[length]='\0';
-	if((!strcmp(read_msg, "REQ LIST"))||(!strcmp(read_msg, "req list"))||(!strcmp(read_msg, "<REQ LIST>"))||(!strcmp(read_msg, "<REQ LIST>\n"))){//list command received
-		handle_list_req(sock_child);// handle list request
+	if((!strcmp(read_msg, "REQ LIST"))||(!strcmp(read_msg, "REQ LIST\n"))||(!strcmp(read_msg, "req list"))||(!strcmp(read_msg, "<REQ LIST>"))||(!strcmp(read_msg, "<REQ LIST>\n"))){//list command received
+		//handle_list_req(sock_child);// handle list request
+		const char* dummyResponse = "server acknowledges list request";
+		write(sock_child,dummyResponse,strlen(dummyResponse));
 		printf("list request handled.\n");
 	}
 	else if((strstr(read_msg,"get")!=NULL)||(strstr(read_msg,"GET")!=NULL)){// get command received
-		xtrct_fname(read_msg, " ");// extract filename from the command		
-		handle_get_req(sock_child, fname);		
+		//xtrct_fname(read_msg, " ");// extract filename from the command		
+		//handle_get_req(sock_child, fname);		
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
-		tokenize_createmsg(read_msg);
-		handle_createtracker_req(sock_child);
+		//tokenize_createmsg(read_msg);
+		//handle_createtracker_req(sock_child);
 		
 	}
 	else if((strstr(read_msg,"updatetracker")!=NULL)||(strstr(read_msg,"Updatetracker")!=NULL)||(strstr(read_msg,"UPDATETRACKER")!=NULL)){// get command received
-		tokenize_updatemsg(read_msg);
-		handle_updatetracker_req(sock_child);		
+		//tokenize_updatemsg(read_msg);
+		//handle_updatetracker_req(sock_child);		
 	}
 	
 }//end client handler function
