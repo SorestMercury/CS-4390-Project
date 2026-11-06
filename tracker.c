@@ -75,7 +75,7 @@ int peer_handler(int sock_child){ // function for file transfer. child process w
 		//handle_get_req(sock_child, fname);		
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
-		//tokenize_createmsg(read_msg);
+		createReq tokens = tokenize_createmsg(read_msg);
 		//handle_createtracker_req(sock_child);
 		
 	}
@@ -85,5 +85,61 @@ int peer_handler(int sock_child){ // function for file transfer. child process w
 	}
 	
 }//end client handler function
+
+typedef struct{
+	char fileName[256];
+	int fileSize;
+	char description[256];
+	char md5[33];
+	char ip[16];
+	int port;
+}createReq;
+
+createReq tokenize_createmsg(const char* msg){
+	createReq request;
+
+	char buf[1024];
+    strncpy(buf, msg, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+
+	char *save;
+	
+	char *cmd = strtok_r(buf, " \t\r\n<>",&save);
+    char *fn  = strtok_r(NULL, " \t\r\n<>",&save);
+    char *sz  = strtok_r(NULL, " \t\r\n<>",&save);
+    char *dsc = strtok_r(NULL, " \t\r\n<>",&save);
+    char *md5 = strtok_r(NULL, " \t\r\n<>",&save);
+    char *ip  = strtok_r(NULL, " \t\r\n<>",&save);
+    char *prt = strtok_r(NULL, " \t\r\n<>",&save);
+
+	if(!cmd || !fn || !sz || !dsc || !md5 || !ip || !prt){
+		perror("missing token from create_tracker request");
+	}
+
+	strncpy(request.fileName, fn, 255);
+	request.fileName[255] = '\0';
+
+	request.fileSize = strtol(sz, NULL, 10);
+
+	strncpy(request.description,dsc,255);
+	request.description[255] = '\0';
+	
+	strncpy(request.md5, md5, 32);
+	request.md5[32] = '\0';
+
+	strncpy(request.ip,ip,15);
+	request.ip[15] = '\0';
+	
+	request.port = strtol(prt, NULL, 10);
+
+	printf("filename:    %s\n", request.fileName);
+	printf("filesize:    %ld\n", request.fileSize);
+	printf("description: %s\n", request.description);
+	printf("md5:         %s\n", request.md5);
+	printf("ip:          %s\n", request.ip);
+	printf("port:        %ld\n", (long)request.port);
+
+	return request;
+}
 
 
