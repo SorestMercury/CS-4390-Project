@@ -18,7 +18,7 @@ void main(int argc,char *argv[]){
 	struct sockaddr_in server_addr;
 	int sockid;
 
-	char msg[256];
+	char msg[1024];
         
 	if ((sockid = socket(AF_INET,SOCK_STREAM,0))==-1){//create socket
 		printf("socket cannot be created\n"); exit(0);

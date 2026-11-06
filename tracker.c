@@ -64,9 +64,19 @@ typedef struct{
 	int port;
 }createReq;
 
+typedef struct{
+	char fileName[256];
+	long startByte;
+	long endByte;
+	char ip[16];
+	int port;
+}updateReq;
+
 //prototypes
 createReq tokenize_createmsg(const char *msg);
 void handle_createtracker_req(int sock_child, createReq tokens);
+updateReq tokenize_updatemsg(const char* msg);
+void handle_updatetracker_req(int sock_child, updateReq tokens);
 
 int peer_handler(int sock_child){ // function for file transfer. child process will call this function     
     //start handiling client request	
@@ -92,8 +102,9 @@ int peer_handler(int sock_child){ // function for file transfer. child process w
 		
 	}
 	else if((strstr(read_msg,"updatetracker")!=NULL)||(strstr(read_msg,"Updatetracker")!=NULL)||(strstr(read_msg,"UPDATETRACKER")!=NULL)){// get command received
-		//tokenize_updatemsg(read_msg);
-		//handle_updatetracker_req(sock_child);		
+		updateReq tokens = tokenize_updatemsg(read_msg);
+		handle_updatetracker_req(sock_child, tokens);
+		exit(0);		
 	}
 	
 }//end client handler function
@@ -138,7 +149,7 @@ createReq tokenize_createmsg(const char* msg){
 	request.ip[15] = '\0';
 	
 	request.port = strtol(prt, NULL, 10);
-	
+
 	return request;
 }
 
@@ -181,3 +192,48 @@ void handle_createtracker_req(int sock_child, createReq tokens){
 	}
 }
 
+updateReq tokenize_updatemsg(const char* msg){
+	updateReq request;
+
+	char buf[1024];
+    strncpy(buf, msg, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+
+	char *save;
+	
+	char *cmd = strtok_r(buf, " \t\r\n<>",&save);
+    char *fn  = strtok_r(NULL, " \t\r\n<>",&save);
+    char *sb  = strtok_r(NULL, " \t\r\n<>",&save);
+    char *eb = strtok_r(NULL, " \t\r\n<>",&save);
+    char *ip  = strtok_r(NULL, " \t\r\n<>",&save);
+    char *prt = strtok_r(NULL, " \t\r\n<>",&save);
+
+	if(!cmd || !fn || !sb || !eb || !ip || !prt){
+		perror("missing token from update_tracker request");
+	}
+
+	strncpy(request.fileName, fn, 255);
+	request.fileName[255] = '\0';
+
+	request.startByte = strtol(sb, NULL, 10);
+	request.endByte = strtol(eb, NULL, 10);
+
+	strncpy(request.ip,ip,15);
+	request.ip[15] = '\0';
+	
+	request.port = strtol(prt, NULL, 10);
+
+	return request;
+}
+
+void handle_updatetracker_req(int sock_child, updateReq tokens){
+	
+	char fileName[sizeof(tokens.fileName) + 15];
+	snprintf(fileName, sizeof(fileName), "torrents/%s.track", tokens.fileName);
+
+	if(file_exists(fileName)){
+
+		//todo
+
+	}
+}
