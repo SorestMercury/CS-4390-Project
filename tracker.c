@@ -53,9 +53,17 @@ int main(){
 	   
      }  //accept loop ends            
 } // main fun ends  
-     
 
+typedef struct{
+	char fileName[256];
+	long fileSize;
+	char description[256];
+	char md5[33];
+	char ip[16];
+	int port;
+}createReq;
 
+createReq tokenize_createmsg(const char *msg);   // prototype
 
 int peer_handler(int sock_child){ // function for file transfer. child process will call this function     
     //start handiling client request	
@@ -76,7 +84,9 @@ int peer_handler(int sock_child){ // function for file transfer. child process w
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
 		createReq tokens = tokenize_createmsg(read_msg);
-		//handle_createtracker_req(sock_child);
+		const char* dummyResponse = "server acknowledges create request";
+		write(sock_child,dummyResponse,strlen(dummyResponse));
+		handle_createtracker_req(sock_child, tokens);
 		
 	}
 	else if((strstr(read_msg,"updatetracker")!=NULL)||(strstr(read_msg,"Updatetracker")!=NULL)||(strstr(read_msg,"UPDATETRACKER")!=NULL)){// get command received
@@ -85,15 +95,6 @@ int peer_handler(int sock_child){ // function for file transfer. child process w
 	}
 	
 }//end client handler function
-
-typedef struct{
-	char fileName[256];
-	int fileSize;
-	char description[256];
-	char md5[33];
-	char ip[16];
-	int port;
-}createReq;
 
 createReq tokenize_createmsg(const char* msg){
 	createReq request;
@@ -137,9 +138,12 @@ createReq tokenize_createmsg(const char* msg){
 	printf("description: %s\n", request.description);
 	printf("md5:         %s\n", request.md5);
 	printf("ip:          %s\n", request.ip);
-	printf("port:        %ld\n", (long)request.port);
+	printf("port:        %d\n", request.port);
 
 	return request;
 }
 
+void handle_createtracker_req(){
+	
+}
 
