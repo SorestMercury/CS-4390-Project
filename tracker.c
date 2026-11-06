@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <errno.h>
 #include <sys/dir.h>
+#include <time.h>
 
 const int MAXLINE=1024;
 int sockid, sock_child;
@@ -63,7 +64,9 @@ typedef struct{
 	int port;
 }createReq;
 
-createReq tokenize_createmsg(const char *msg);   // prototype
+//prototypes
+createReq tokenize_createmsg(const char *msg);
+void handle_createtracker_req(int sock_child, createReq tokens);
 
 int peer_handler(int sock_child){ // function for file transfer. child process will call this function     
     //start handiling client request	
@@ -84,9 +87,8 @@ int peer_handler(int sock_child){ // function for file transfer. child process w
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
 		createReq tokens = tokenize_createmsg(read_msg);
-		const char* dummyResponse = "server acknowledges create request";
-		write(sock_child,dummyResponse,strlen(dummyResponse));
 		handle_createtracker_req(sock_child, tokens);
+		exit(0);
 		
 	}
 	else if((strstr(read_msg,"updatetracker")!=NULL)||(strstr(read_msg,"Updatetracker")!=NULL)||(strstr(read_msg,"UPDATETRACKER")!=NULL)){// get command received
@@ -95,6 +97,10 @@ int peer_handler(int sock_child){ // function for file transfer. child process w
 	}
 	
 }//end client handler function
+
+int file_exists(const char *filename) {
+    return access(filename, F_OK) == 0;
+}
 
 createReq tokenize_createmsg(const char* msg){
 	createReq request;
@@ -132,18 +138,46 @@ createReq tokenize_createmsg(const char* msg){
 	request.ip[15] = '\0';
 	
 	request.port = strtol(prt, NULL, 10);
-
-	printf("filename:    %s\n", request.fileName);
-	printf("filesize:    %ld\n", request.fileSize);
-	printf("description: %s\n", request.description);
-	printf("md5:         %s\n", request.md5);
-	printf("ip:          %s\n", request.ip);
-	printf("port:        %d\n", request.port);
-
+	
 	return request;
 }
 
-void handle_createtracker_req(){
-	
+void handle_createtracker_req(int sock_child, createReq tokens){
+
+	char fileName[sizeof(tokens.fileName) + 15];
+	snprintf(fileName, sizeof(fileName), "torrents/%s.track", tokens.fileName);
+
+	if(!file_exists(fileName)){
+		FILE *file = fopen(fileName,"w");
+
+		if (file == NULL) {
+			perror("Error opening or creating the file!");
+		}
+
+		time_t now = time(NULL);
+
+		fprintf(file, "Filename:    %s\n", tokens.fileName);
+		fprintf(file, "Filesize:    %ld\n", tokens.fileSize);
+		fprintf(file, "Description: %s\n", tokens.description);
+		fprintf(file, "Md5:         %s\n", tokens.md5);
+		fprintf(file, "%s:", tokens.ip);
+		fprintf(file, "%d:0:", tokens.port);
+		fprintf(file, "%ld:", tokens.fileSize);
+		fprintf(file, "%ld\n", (long)now);
+
+		fclose(file);
+
+		const char* msgPeer = "<createtracker succ>";
+		printf("%s",msgPeer);
+		write(sock_child,msgPeer,strlen(msgPeer));
+		close(sock_child);
+	}
+
+	else{
+		const char* msgPeer = "<createtracker ferr>";
+		printf("%s",msgPeer);
+		write(sock_child,msgPeer,strlen(msgPeer));
+		close(sock_child);
+	}
 }
 
