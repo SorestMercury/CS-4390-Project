@@ -64,6 +64,10 @@ void main(int argc,char *argv[]){
 
 			msg[n] = '\0'; //append null terminator to read message
     		printf("%s\n", msg);
+		}else if(strcmp(cmd, "GET")){
+			//IMPLEMENT GET FUNCTIONALITY HERE
+		}else if(strcmp(cmd, "UPDATETRACKER")){
+			//IMPLEMENT UPDATETRACKER FUNCTIONALITY HERE
 		}
 	}
 	close(sockid);
