@@ -13,7 +13,21 @@ void main(int argc,char *argv[]){
 	
    	char *server_address = "127.0.0.1";
 	int server_port=5000;  // you should instead read from configuration file
-    
+
+	FILE *file = fopen("config.txt", "r");
+	char buffer[256];
+	while (fgets(buffer, sizeof(buffer), file) != NULL){
+		printf("Read line: %s", buffer);
+		/*char *linearg = strtok(buffer, " ");
+		if (strcmp(linearg, "server_address") != 0) {
+			*server_address = linearg[1];
+		} else if (strcmp(linearg, "server_port") != 0) {
+			server_port = linearg[1];
+		}*/
+	}
+	fclose(file);
+	printf("File read complete.");
+	printf("hi");
    
 	struct sockaddr_in server_addr;
 	int sockid;
