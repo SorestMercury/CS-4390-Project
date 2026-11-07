@@ -14,20 +14,18 @@ void main(int argc,char *argv[]){
    	char *server_address = "127.0.0.1";
 	int server_port=5000;  // you should instead read from configuration file
 
+	// Read server address and port from configuration file
 	FILE *file = fopen("config.txt", "r");
 	char buffer[256];
 	while (fgets(buffer, sizeof(buffer), file) != NULL){
-		printf("Read line: %s", buffer);
-		/*char *linearg = strtok(buffer, " ");
-		if (strcmp(linearg, "server_address") != 0) {
-			*server_address = linearg[1];
-		} else if (strcmp(linearg, "server_port") != 0) {
-			server_port = linearg[1];
-		}*/
+		char *linearg = strtok(buffer, " ");
+		if (strcmp(linearg, "server_ip") == 0) {
+			server_address = strdup(strtok(NULL, " \n"));
+		} else if (strcmp(linearg, "server_port") == 0) {
+			server_port = atoi(strdup(strtok(NULL, " \n")));
+		}
 	}
 	fclose(file);
-	printf("File read complete.");
-	printf("hi");
    
     char cmd[128];
 
@@ -82,7 +80,7 @@ void main(int argc,char *argv[]){
 			msg[n] = '\0'; //append null terminator to read message
     		printf("%s\n", msg);
 		}
-		else if(strcmp(cmd, "GET")){
+		else if(strcmp(cmd, "GET") == 0){
 			//IMPLEMENT GET FUNCTIONALITY HERE
 		}
 
