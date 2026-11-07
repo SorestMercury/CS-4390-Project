@@ -243,8 +243,21 @@ void handle_updatetracker_req(int sock_child, updateReq tokens){
 
 		time_t now = time(NULL);
 
+		typedef struct { long start, end; } range;
 		char key[64];
+		range ranges[128];
+		char line[256];
+
 		snprintf(key, sizeof(key), "%s:%d", tokens.ip, tokens.port);
+
+		while(fgets(line,sizeof(line),file)){
+			if(strncmp(line, key, strlen(key) == 0)){
+
+				long start, end;
+				sscanf(line+strlen(key), "%ld:%ld",start,end);
+
+			}
+		}
 
 	}
 
