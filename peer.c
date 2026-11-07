@@ -19,6 +19,7 @@ void main(int argc,char *argv[]){
 	int sockid;
 
 	char msg[1024];
+	char cmd[128];
         
 	if ((sockid = socket(AF_INET,SOCK_STREAM,0))==-1){//create socket
 		printf("socket cannot be created\n"); exit(0);
@@ -32,46 +33,42 @@ void main(int argc,char *argv[]){
 	}
 
    /* If connected successfully*/
-	int list = 0;
-	int createTracker = 1;
-	if(list){// if this is LIST command
-		// I changed this to 1 for now so that its always true for testing purposes. I will later handle running this block with proper timing
-		const char* list_req="REQ LIST";
-		if((write(sockid,list_req,strlen(list_req))) < 0){//inform the server of the list request
-			printf("Send_request  failure\n"); exit(0);
-		}
+	while (cmd != "EXIT"){
+		printf("Enter command: ");
+		fgets(cmd, sizeof(cmd), stdin);
+		cmd[strcspn(cmd, "\n")] = 0; // Remove the newline character
+		if(cmd =="LIST"){
+			// I changed this to 1 for now so that its always true for testing purposes. I will later handle running this block with proper timing
+			const char* list_req="REQ LIST";
+			if((write(sockid,list_req,strlen(list_req))) < 0){//inform the server of the list request
+				printf("Send_request  failure\n"); exit(0);
+			}
 		
-		int n; //store length of read data
-        if((n = read(sockid,(char *)&msg,sizeof(msg)))< 0){// read what server has said
-			printf("Read  failure\n"); exit(0); 
+			int n; //store length of read data
+        	if((n = read(sockid,(char *)&msg,sizeof(msg)))< 0){// read what server has said
+				printf("Read  failure\n"); exit(0); 
+			}
+
+			msg[n] = '\0'; //append null terminator to read message
+    		printf("%s\n", msg);
+		}else if(cmd =="CREATETRACKER"){
+			const char* create_req="createtracker movie1.avi 109283519 Ghost_and_the_Darkness,_DVD_Rip c68c2ee8bfca4e898b396e7a935a1d92 202.141.60.10 2097\n";
+			if((write(sockid,create_req,strlen(create_req))) < 0){//inform the server of the create request
+				printf("Send_request  failure\n"); exit(0);
+			}
+
+			int n; //store length of read data
+        	if((n = read(sockid,(char *)&msg,sizeof(msg)))< 0){// read what server has said
+				printf("Read  failure\n"); exit(0); 
+			}
+
+			msg[n] = '\0'; //append null terminator to read message
+    		printf("%s\n", msg);
 		}
-
-		msg[n] = '\0'; //append null terminator to read message
-    	printf("%s\n", msg);
-		
-		close(sockid);
-		printf("Connection closed\n");
-	    exit(0);
-	}//end close
-
-	else if(createTracker){
-		const char* create_req="createtracker movie1.avi 109283519 Ghost_and_the_Darkness,_DVD_Rip c68c2ee8bfca4e898b396e7a935a1d92 202.141.60.10 2097\n";
-		if((write(sockid,create_req,strlen(create_req))) < 0){//inform the server of the create request
-			printf("Send_request  failure\n"); exit(0);
-		}
-
-		int n; //store length of read data
-        if((n = read(sockid,(char *)&msg,sizeof(msg)))< 0){// read what server has said
-			printf("Read  failure\n"); exit(0); 
-		}
-
-		msg[n] = '\0'; //append null terminator to read message
-    	printf("%s\n", msg);
-		
-		close(sockid);
-		printf("Connection closed\n");
-	    exit(0);
 	}
+	close(sockid);
+	printf("Connection closed\n");
+	exit(0);
 
 }	     
   
