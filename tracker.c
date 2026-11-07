@@ -116,12 +116,14 @@ int file_exists(const char *filename) {
 createReq tokenize_createmsg(const char* msg){
 	createReq request;
 
+	//copy message into buffer
 	char buf[1024];
     strncpy(buf, msg, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
 
-	char *save;
+	char *save; //save pointer for threadsafe strtok
 	
+	//split message into tokens
 	char *cmd = strtok_r(buf, " \t\r\n<>",&save);
     char *fn  = strtok_r(NULL, " \t\r\n<>",&save);
     char *sz  = strtok_r(NULL, " \t\r\n<>",&save);
@@ -134,6 +136,7 @@ createReq tokenize_createmsg(const char* msg){
 		perror("missing token from create_tracker request");
 	}
 
+	//store attributes inside of createReq
 	strncpy(request.fileName, fn, 255);
 	request.fileName[255] = '\0';
 
@@ -155,10 +158,12 @@ createReq tokenize_createmsg(const char* msg){
 
 void handle_createtracker_req(int sock_child, createReq tokens){
 
+	//append .track to file to check if it exists in true directory
 	char fileName[sizeof(tokens.fileName) + 15];
 	snprintf(fileName, sizeof(fileName), "torrents/%s.track", tokens.fileName);
 
 	if(!file_exists(fileName)){
+		//open file
 		FILE *file = fopen(fileName,"w");
 
 		if (file == NULL) {
@@ -167,6 +172,7 @@ void handle_createtracker_req(int sock_child, createReq tokens){
 
 		time_t now = time(NULL);
 
+		//write information from tokens into file
 		fprintf(file, "Filename:    %s\n", tokens.fileName);
 		fprintf(file, "Filesize:    %ld\n", tokens.fileSize);
 		fprintf(file, "Description: %s\n", tokens.description);
@@ -178,12 +184,14 @@ void handle_createtracker_req(int sock_child, createReq tokens){
 
 		fclose(file);
 
+		//inform client of success
 		const char* msgPeer = "<createtracker succ>";
 		printf("%s",msgPeer);
 		write(sock_child,msgPeer,strlen(msgPeer));
 		close(sock_child);
 	}
 
+	//inform client of failure
 	else{
 		const char* msgPeer = "<createtracker ferr>";
 		printf("%s",msgPeer);
@@ -195,12 +203,14 @@ void handle_createtracker_req(int sock_child, createReq tokens){
 updateReq tokenize_updatemsg(const char* msg){
 	updateReq request;
 
+	//copy message into buffer
 	char buf[1024];
     strncpy(buf, msg, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
 
-	char *save;
+	char *save; //save pointer for threadsafe strtok
 	
+	//split message into tokens
 	char *cmd = strtok_r(buf, " \t\r\n<>",&save);
     char *fn  = strtok_r(NULL, " \t\r\n<>",&save);
     char *sb  = strtok_r(NULL, " \t\r\n<>",&save);
@@ -212,6 +222,7 @@ updateReq tokenize_updatemsg(const char* msg){
 		perror("missing token from update_tracker request");
 	}
 
+	//store attributes inside of updateReq
 	strncpy(request.fileName, fn, 255);
 	request.fileName[255] = '\0';
 
@@ -226,40 +237,112 @@ updateReq tokenize_updatemsg(const char* msg){
 	return request;
 }
 
+//range type for comparisons later
+typedef struct { long start, end; } range;
+
+//to compare ranges by start value for sorting
+static int cmp_start(const void *a, const void *b) {
+			long x = ((const range *)a)->start;
+			long y = ((const range *)b)->start;
+			return (x > y) - (x < y); 
+		}
+
 void handle_updatetracker_req(int sock_child, updateReq tokens){
-	
+
+	//append .track to file to check if it exists in true directory
 	char fileName[sizeof(tokens.fileName) + 15];
 	snprintf(fileName, sizeof(fileName), "torrents/%s.track", tokens.fileName);
 
 	if(file_exists(fileName)){
-
-		if(file_exists(fileName)){
-
-		FILE *file = fopen(fileName,"w");
+		//open file
+		FILE *file = fopen(fileName,"r");
 
 		if (file == NULL) {
 			perror("Error opening or creating the file!");
 		}
 
-		time_t now = time(NULL);
-
-		typedef struct { long start, end; } range;
-		char key[64];
+		//maximum of 128 possible entries of same ip:port combo in tracker file
 		range ranges[128];
-		char line[256];
+		int rangen = 0;
 
-		snprintf(key, sizeof(key), "%s:%d", tokens.ip, tokens.port);
+		char line[1024];
+		char key[64];
+
+		//create temp path/file to modify instead of modifying original tracker file
+		char tmpPath[512];
+		snprintf(tmpPath, sizeof(tmpPath), "%s.XXXXXX", fileName);
+		int fd = mkstemp(tmpPath);          
+		if (fd < 0) { perror("mkstemp"); }
+
+		FILE *temp = fdopen(fd, "w");        
+		if (!temp) { perror("fdopen"); close(fd); remove(tmpPath); }
+
+		//create unique ip:port combo to search for in line
+		snprintf(key, sizeof(key), "%s:%d:", tokens.ip, tokens.port);
+		size_t keylen = strlen(key);
 
 		while(fgets(line,sizeof(line),file)){
-			if(strncmp(line, key, strlen(key) == 0)){
+			if(strncmp(line, key, strlen(key)) == 0){ //if line contains key
 
 				long start, end;
-				sscanf(line+strlen(key), "%ld:%ld",start,end);
-
+				if (sscanf(line + keylen, "%ld:%ld", &start, &end) == 2 && rangen < 128) {
+					//load start and end of range into array of ranges, increment to next spot in array
+					ranges[rangen].start = start;
+					ranges[rangen].end = end;
+					rangen++;
+				}
 			}
+
+			else //no key contained in line, write it back to temp file as is
+				fputs(line, temp);                 
 		}
 
-	}
+		if(rangen<128) { //add the range from the updatetracker command to the array of ranges
+			ranges[rangen].start = tokens.startByte; 
+			ranges[rangen].end = tokens.endByte;
+			rangen++;
+		}
 
+		qsort(ranges, rangen, sizeof(range), cmp_start); //sort the array of ranges by start time
+
+		long start = ranges[0].start;
+		long end = ranges[0].end;
+		time_t now = time(NULL);
+
+		for(int i = 1;i<rangen;i++){ //iterate through array, build merged contiguous ranges for ranges that overlap
+
+			if(ranges[i].start <= end){
+				if(ranges[i].end > end)
+					end = ranges[i].end;
+			}
+
+			else {
+				fprintf(temp, "%s%ld:%ld:%ld\n", key, start, end, now); //if this range doesnt overlap with the previous, write current merged range to file, start new merge
+				start = ranges[i].start;
+				end   = ranges[i].end;
+        	}
+		}
+
+		fprintf(temp, "%s%ld:%ld:%ld\n", key, start, end, now); //write final merged range to file
+		fclose(temp);
+		fclose(file);
+		
+		char msgPeer[1024];
+
+		//replace current trackerfile with temp file, notify client of success/fail
+		if (rename(tmpPath, fileName) != 0) {
+			perror("rename");
+			remove(tmpPath);
+			snprintf(msgPeer, 1024, "<updatetracker %s fail>", tokens.fileName);
+			printf("%s",msgPeer);
+		} 
+		
+		else {
+			snprintf(msgPeer, 1024, "<updatetracker %s succ>", tokens.fileName);
+		}
+
+		printf("%s",msgPeer);
+		write(sock_child,msgPeer,strlen(msgPeer));
+		close(sock_child);
 	}
 }
