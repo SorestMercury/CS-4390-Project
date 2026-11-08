@@ -44,7 +44,6 @@ void main(int argc,char *argv[]){
 												
 		server_addr.sin_family = AF_INET;//host byte order
 		server_addr.sin_port = htons(server_port);// convert to network byte order
-		printf("\nConnecting to server at %s:%d\n", server_address, server_port);
 
 		if (inet_pton(AF_INET, server_address, &server_addr.sin_addr) != 1) {
     		printf("Bad server address\n"); exit(0);
@@ -95,7 +94,7 @@ void main(int argc,char *argv[]){
 			strcpy(md5, args[3]);
 			fileSize = atol(args[4]);
 			strcpy(ip, args[5]);
-			char create_req[597]; // 256 + 256 + 33 + 10 + 16 + extra for command and spaces
+			char create_req[600]; // 256 + 256 + 33 + 10 + 16 + extra for command and spaces
 			sprintf(create_req, "createtracker %s %s %s %ld %s\n", fileName, description, md5, fileSize, ip);
 			printf("Sending request: %s\n", create_req);
 			if((write(sockid,create_req,strlen(create_req))) < 0){//inform the server of the create request
@@ -123,7 +122,7 @@ void main(int argc,char *argv[]){
                         sprintf(flocation, "cache/%s", fn);
 	                FILE* fptr = fopen(flocation, "w");
 	                if (fptr == NULL) {
-                                printf("FILE FAILED TO OPEN");
+                                printf("FILE FAILED TO OPEN\n");
                                 exit(0);
                         }
                         int loop = 1;
