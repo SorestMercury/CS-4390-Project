@@ -6,13 +6,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include "definitions.h"
 
+void xtract_fname(const char *msg, char* fname); //used with GET
 
 void main(int argc,char *argv[]){
 	
    	char *server_address = "127.0.0.1";
-	int server_port=5000;  // you should instead read from configuration file
+	int server_port=5001;  // you should instead read from configuration file
 
 	// Read server address and port from configuration file
 	FILE *file = fopen("config.txt", "r");
@@ -42,8 +44,12 @@ void main(int argc,char *argv[]){
 	
 		server_addr.sin_family = AF_INET;//host byte order
 		server_addr.sin_port = htons(server_port);// convert to network byte order
+		printf("sip: %s\n", server_address);
+		printf("sport: %i\n", server_port);
 		if (connect(sockid ,(struct sockaddr *) &server_addr,sizeof(struct sockaddr))==-1){//connect and error check
-			printf("Cannot connect to server\n"); exit(0);
+			printf("Cannot connect to server\n");
+			printf("errno: %i\n", errno);
+			exit(0);
 		}
 
 		/* If connected successfully*/
@@ -80,8 +86,31 @@ void main(int argc,char *argv[]){
 			msg[n] = '\0'; //append null terminator to read message
     		printf("%s\n", msg);
 		}
-		else if(strcmp(cmd, "GET") == 0){
+		else if(strncmp(cmd, "GET", 3) == 0){ //get command
 			//IMPLEMENT GET FUNCTIONALITY HERE
+			write(sockid, cmd, strlen(cmd));
+			read(sockid, (char*)&msg, sizeof(msg)); //REP GET
+			printf("%s\n", msg);
+			char fn[64];
+			//xtract_fname(cmd, fn);
+			char flocation[256];
+                        //sprintf(flocation, "/cache/%s", fn);
+	                /*FILE* fptr = fopen(fn, "w");
+	                if (fptr == NULL) {
+                                printf("FILE FAILED TO OPEN");
+                                exit(0);
+                        }
+                        int loop = 1;
+                        while (loop == 1) {
+                            read(sockid, (char*)&msg, sizeof(msg));
+                            printf("%s\n", msg);
+                            if (strncmp(msg, "REP GET END", 11) == 0) {
+                              //IMPLEMENT MD5 CHECK HERE
+                              loop = 0;
+                            }
+                            fputs(msg, fptr);
+                        }
+                        fclose(fptr);*/
 		}
 
 		else if(strcmp(cmd, "UPDATETRACKER") == 0){
@@ -104,4 +133,13 @@ void main(int argc,char *argv[]){
 	}
 	exit(0);
 }	     
-  
+
+void xtract_fname(const char *msg, char* fname) {
+    int i = 0;
+    while (msg[i+4] != '\0') { //GET filename.track
+        fname[i] = msg[i+4];
+        i++;
+    }
+    fname[i] = '\0';
+    return;
+}
