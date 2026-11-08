@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <ifaddrs.h>
 #include "definitions.h"
 
 void xtract_fname(const char *msg, char* fname); //used with GET
@@ -85,17 +86,38 @@ void main(int argc,char *argv[]){
 		else if(strcmp(cmd, "CREATETRACKER") == 0){
 			char fileName[256], description[256], md5[33], ip[16];
 			long fileSize;
-			if (i < 6) {
-				printf("Error: CREATETRACKER command requires 5 arguments.\n");
+			if (i < 2) {
+				printf("Error: CREATETRACKER command requires 2 arguments.\n");
 				continue;
 			}
-			strcpy(fileName, args[1]);
-			strcpy(description, args[2]);
-			strcpy(md5, args[3]);
-			fileSize = atol(args[4]);
-			strcpy(ip, args[5]);
+			FILE *file = fopen(args[1], "rb");
+			if (file == NULL) {
+				printf("Error: Could not open file %s\n", args[1]);
+				continue;
+			}
+			fseek(file, 0, SEEK_END);
+			fileSize = ftell(file);
+			struct ifaddrs *ifaddr, *ifa;
+			if (getifaddrs(&ifaddr) == -1) {
+				perror("getifaddrs");
+				exit(EXIT_FAILURE);
+			}
+
+			for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+				if (ifa->ifa_addr == NULL) continue;
+				if (ifa->ifa_addr->sa_family == AF_INET) {
+					struct sockaddr_in *sa = (struct sockaddr_in *) ifa->ifa_addr;
+					inet_ntop(AF_INET, &(sa->sin_addr), ip, sizeof(ip));
+					printf("IP Address: %s\n", ip);
+					break;
+				}
+			}
+			freeifaddrs(ifaddr);
+
+			fclose(file);
 			char create_req[600]; // 256 + 256 + 33 + 10 + 16 + extra for command and spaces
-			sprintf(create_req, "createtracker %s %s %s %ld %s\n", fileName, description, md5, fileSize, ip);
+			//Format is: CREATETRACKER <filename> <filesize> <description> <md5> <ip> <port>
+			sprintf(create_req, "createtracker %s %ld %s %s %s %d\n", args[1], fileSize, args[2], md5, ip, port);
 			printf("Sending request: %s\n", create_req);
 			if((write(sockid,create_req,strlen(create_req))) < 0){//inform the server of the create request
 				printf("Send_request  failure\n"); exit(0);
@@ -146,6 +168,7 @@ void main(int argc,char *argv[]){
 		}
 
 		else if(strcmp(cmd, "UPDATETRACKER") == 0){
+			//Format is: UPDATETRACKER <filename> <filesize> <description> <md5> <ip>
 			const char* create_req="updatetracker movie1.avi 109283521 109283530 202.141.60.10 2097\n";
 			if((write(sockid,create_req,strlen(create_req))) < 0){//inform the server of the create request
 				printf("Send_request  failure\n"); exit(0);
