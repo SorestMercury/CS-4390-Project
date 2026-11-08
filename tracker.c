@@ -22,6 +22,17 @@ int main(){
    if ((sockid = socket(AF_INET,SOCK_STREAM,0)) < 0){//create socket connection oriented
 	   printf("socket cannot be created \n"); exit(0); 
    }
+
+   // Read server port from configuration file
+	FILE *file = fopen("config.txt", "r");
+	char buffer[256];
+	while (fgets(buffer, sizeof(buffer), file) != NULL){
+		char *linearg = strtok(buffer, " ");
+		if(strcmp(linearg, "server_port") == 0) {
+			server_port = atoi(strdup(strtok(NULL, " \n")));
+		}
+	}
+	fclose(file);
     
    //socket created at this stage
    //now associate the socket with local port to allow listening incoming connections
