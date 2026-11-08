@@ -94,7 +94,8 @@ int peer_handler(int sock_child){ // function for file transfer. child process w
 		printf("list request handled.\n");
 	}
 	else if((strstr(read_msg,"get")!=NULL)||(strstr(read_msg,"GET")!=NULL)){// get command received
-		xtract_fname(read_msg, fname); //extract filename from the command		
+		xtract_fname(read_msg, fname); //extract filename from the command	
+		printf("%s\n",fname);	
 		handle_get_req(sock_child, fname);		
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
@@ -351,7 +352,7 @@ void handle_updatetracker_req(int sock_child, updateReq tokens){
 
 void xtract_fname(const char *msg, char* fname) {
     int i = 0;
-    while (msg[i+4] != '\0') { //GET filename.track
+    while (msg[i+4] != '\0' && msg[i+4] != '\n') { //GET filename.track
         fname[i] = msg[i+4];
         i++;
     }
@@ -362,15 +363,16 @@ void xtract_fname(const char *msg, char* fname) {
 void handle_get_req(int sock_child, const char* fname) {
         printf("REP GET BEGIN\n");
         send(sock_child, "REP GET BEGIN", 14, 0);
-        char buff[100];
-        recv(sock_child, buff, 100, 0);
+        char buff[256];
+        int n = recv(sock_child, buff, sizeof(buff)-1, 0);
+		buff[n] = '\0';
         //printf("CONFIRM\n");
         char flocation[256];
         sprintf(flocation, "torrents/%s", fname);
 	FILE* fptr = fopen(flocation, "r");
 	if (fptr == NULL) {
 	  printf("FILE FAILED TO OPEN\n");
-          return;
+	  exit(0);	
 	}
 	char line[MAXLINE];
 	while (fgets(line, MAXLINE, fptr)) { //read file one line at a time
