@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <arpa/inet.h>
 #include "definitions.h"
 
 void xtract_fname(const char *msg, char* fname); //used with GET
@@ -42,8 +43,6 @@ void main(int argc,char *argv[]){
 												
 		server_addr.sin_family = AF_INET;//host byte order
 		server_addr.sin_port = htons(server_port);// convert to network byte order
-		printf("sip: %s\n", server_address);
-		printf("sport: %i\n", server_port);
 
 		if (inet_pton(AF_INET, server_address, &server_addr.sin_addr) != 1) {
     		printf("Bad server address\n"); exit(0);
@@ -91,28 +90,36 @@ void main(int argc,char *argv[]){
 		}
 		else if(strncmp(cmd, "GET", 3) == 0){ //get command
 			//IMPLEMENT GET FUNCTIONALITY HERE
-			write(sockid, cmd, strlen(cmd));
-			read(sockid, (char*)&msg, sizeof(msg)); //REP GET
+			send(sockid, cmd, strlen(cmd), 0);
+			int n = recv(sockid, (char*)&msg, sizeof(msg), 0); //REP GET
+			send(sockid, "CONFIRM", 7, 0);
+			msg[n] = '\0';
 			printf("%s\n", msg);
 			char fn[64];
 			xtract_fname(cmd, fn);
 			char flocation[256];
-                        sprintf(flocation, "/cache/%s", fn);
-	                FILE* fptr = fopen(fn, "w");
+                        sprintf(flocation, "cache/%s", fn);
+	                FILE* fptr = fopen(flocation, "w");
 	                if (fptr == NULL) {
                                 printf("FILE FAILED TO OPEN");
                                 exit(0);
                         }
                         int loop = 1;
-                        while (loop == 1) {
-                            read(sockid, (char*)&msg, sizeof(msg));
-                            printf("%s\n", msg);
-                            if (strncmp(msg, "REP GET END", 11) == 0) {
-								printf("do I ever reach?");
+                        while (loop > 0) {
+                            n = recv(sockid, (char *)&msg, sizeof(msg), 0);
+                            msg[n] = '\0';
+                            printf("line %d: %s\n", loop, msg);
+                            char* end = strstr(msg, "REP GET END");
+                            if (end) {
                               //IMPLEMENT MD5 CHECK HERE
                               loop = 0;
+                              end[0] = '\0';
+                            }
+                            else {
+                              loop++;
                             }
                             fputs(msg, fptr);
+                            send(sockid, "CONFIRM", 7, 0);
                         }
                         fclose(fptr);
 		}

@@ -39,14 +39,5 @@ Work Log:
 * Dylan fully implemented handling the createtracker and updatetracker commands on the server side (11/06/26)
 
   * tokenize\_createmsg, tokenize\_updatemsg, handle\_createtracker\_req, handle\_updatetracker\_req
-
-
-
-
-
-
-
-did some work on the get command
-
-the commented out parts are the parts that currently make the peer unable to connect to the tracker; no clue why. The things that I've specifically uncommented to test have been xtract fname, then FILE\* fptr and fclose fptr
+* Get command implemented (11/7/26)
 

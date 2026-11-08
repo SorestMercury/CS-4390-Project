@@ -361,23 +361,29 @@ void xtract_fname(const char *msg, char* fname) {
 
 void handle_get_req(int sock_child, const char* fname) {
         printf("REP GET BEGIN\n");
-        write(sock_child, "REP GET BEGIN\n", 15);
+        send(sock_child, "REP GET BEGIN", 14, 0);
+        char buff[100];
+        recv(sock_child, buff, 100, 0);
+        //printf("CONFIRM\n");
         char flocation[256];
-        strcat(flocation, "/torrents/");
-        strcat(flocation, fname);
+        sprintf(flocation, "torrents/%s", fname);
 	FILE* fptr = fopen(flocation, "r");
 	if (fptr == NULL) {
-	  printf("FILE FAILED TO OPEN");
+	  printf("FILE FAILED TO OPEN\n");
           return;
 	}
 	char line[MAXLINE];
 	while (fgets(line, MAXLINE, fptr)) { //read file one line at a time
 		//write to socket
 		printf("%s", line);
-		write(sock_child,line,strlen(line));
+		send(sock_child,line,strlen(line), 0);
+		char buff[100];
+		recv(sock_child, buff, 100, 0);
+		//printf("CONFIRM\n");
 	}
 	fclose(fptr);
-	printf("REP GET END"); //IMPLEMENT AND APPEND FILE MD5
-	write(sock_child, "REP GET END", 12);
+	printf("REP GET END md5\n"); //IMPLEMENT AND APPEND FILE MD5
+	send(sock_child, "REP GET END md5", 16, 0);
+	close(sock_child);
 	return;
 }
