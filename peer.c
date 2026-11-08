@@ -17,16 +17,20 @@ void main(int argc,char *argv[]){
 	
    	char *server_address = "127.0.0.1";
 	int server_port=5001;  // you should instead read from configuration file
+	int update_interval=30;
+	char shared_folder[256] = "./torrents";
 
 	// Read server address and port from configuration file
-	FILE *file = fopen("config.txt", "r");
+	FILE *file = fopen("clientThreadConfig.txt", "r");
 	char buffer[256];
 	while (fgets(buffer, sizeof(buffer), file) != NULL){
 		char *linearg = strtok(buffer, " ");
-		if (strcmp(linearg, "server_ip") == 0) {
+		if (strcmp(linearg, "TRACKER_IP") == 0) {
 			server_address = strdup(strtok(NULL, " \r\n"));
-		} else if (strcmp(linearg, "server_port") == 0) {
+		} else if (strcmp(linearg, "TRACKER_PORT") == 0) {
 			server_port = atoi(strdup(strtok(NULL, " \r\n")));
+		} else if (strcmp(linearg, "UPDATE_INTERVAL_SECONDS") == 0) {
+			update_interval = atoi(strdup(strtok(NULL, " \r\n")));
 		}
 	}
 	fclose(file);
@@ -117,7 +121,7 @@ void main(int argc,char *argv[]){
 			fclose(file);
 			char create_req[600]; // 256 + 256 + 33 + 10 + 16 + extra for command and spaces
 			//Format is: CREATETRACKER <filename> <filesize> <description> <md5> <ip> <port>
-			sprintf(create_req, "createtracker %s %ld %s %s %s %d\n", args[1], fileSize, args[2], md5, ip, port);
+			sprintf(create_req, "createtracker %s %ld %s %s %s %d\n", args[1], fileSize, args[2], md5, ip, server_port);
 			printf("Sending request: %s\n", create_req);
 			if((write(sockid,create_req,strlen(create_req))) < 0){//inform the server of the create request
 				printf("Send_request  failure\n"); exit(0);
