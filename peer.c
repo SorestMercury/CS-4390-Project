@@ -31,6 +31,7 @@ void main(int argc,char *argv[]){
 	fclose(file);
    
     char cmd[256];
+	char cmdTok[256]; //so that original command is not modified when tokenized, incase needed
 	char *args[10]; // Array to hold command arguments
 
 	while (strcmp(cmd, "EXIT") != 0){
@@ -60,9 +61,10 @@ void main(int argc,char *argv[]){
 		printf("Enter command: ");
 		fgets(cmd, sizeof(cmd), stdin);
 		cmd[strcspn(cmd, "\n")] = 0; // Remove the newline character
-		args[0] = strtok(cmd, " "); // Tokenize the command
+		strcpy(cmdTok,cmd); //so that original command is not modified when tokenized, incase needed
+		args[0] = strtok(cmdTok, " "); // Tokenize the command
 		int i = 1;
-		while ((args[i] = strtok(NULL, " ")) != NULL) {
+		while ((args[i] = strtok(NULL, " \n\0")) != NULL) {
 			i++;
 		}
 		args[i] = NULL; // Null-terminate the array
@@ -109,17 +111,16 @@ void main(int argc,char *argv[]){
 			msg[n] = '\0'; //append null terminator to read message
     		printf("%s\n", msg);
 		}
-		else if(strncmp(cmd, "GET", 3) == 0){ //get command
+		else if(strncmp(args[0], "GET", 3) == 0){ //get command
 			//IMPLEMENT GET FUNCTIONALITY HERE
+			printf("%s",cmd);
 			send(sockid, cmd, strlen(cmd), 0);
 			int n = recv(sockid, (char*)&msg, sizeof(msg), 0); //REP GET
 			send(sockid, "CONFIRM", 7, 0);
 			msg[n] = '\0';
 			printf("%s\n", msg);
-			char fn[64];
-			xtract_fname(cmd, fn);
 			char flocation[256];
-                        sprintf(flocation, "cache/%s", fn);
+                        sprintf(flocation, "cache/%s", args[1]);
 	                FILE* fptr = fopen(flocation, "w");
 	                if (fptr == NULL) {
                                 printf("FILE FAILED TO OPEN\n");
