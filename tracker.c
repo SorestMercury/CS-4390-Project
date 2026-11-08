@@ -11,7 +11,7 @@
 
 const int MAXLINE=1024;
 int sockid, sock_child;
-int server_port=5000;
+int server_port=5001;
 socklen_t clilen;
 
 int peer_handler(int sock_child);
@@ -43,11 +43,11 @@ int main(){
    if (bind(sockid ,(struct sockaddr *) &server_addr,sizeof(server_addr)) ==-1){//bind and check error
 	   printf("bind failure\n"); exit(0); 
    }
-    
+  
    printf("Tracker SERVER READY TO LISTEN INCOMING REQUEST.... \n");
    if (listen(sockid, 0) < 0){ //(parent) process listens at sockid and check error
 	   printf(" Tracker  SERVER CANNOT LISTEN\n"); exit(0);
-   }    
+   }
    clilen = sizeof(client_addr);                                    
    
    while(1) { //accept  connection from every requester client
@@ -88,6 +88,8 @@ createReq tokenize_createmsg(const char *msg);
 void handle_createtracker_req(int sock_child, createReq tokens);
 updateReq tokenize_updatemsg(const char* msg);
 void handle_updatetracker_req(int sock_child, updateReq tokens);
+void xtract_fname(const char *msg, char* fname);
+void handle_get_req(int sock_child, const char* fname);
 
 int peer_handler(int sock_child){ // function for file transfer. child process will call this function     
     //start handiling client request	
@@ -103,8 +105,9 @@ int peer_handler(int sock_child){ // function for file transfer. child process w
 		printf("list request handled.\n");
 	}
 	else if((strstr(read_msg,"get")!=NULL)||(strstr(read_msg,"GET")!=NULL)){// get command received
-		//xtrct_fname(read_msg, " ");// extract filename from the command		
-		//handle_get_req(sock_child, fname);		
+		xtract_fname(read_msg, fname); //extract filename from the command	
+		printf("%s\n",fname);	
+		handle_get_req(sock_child, fname);		
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
 		createReq tokens = tokenize_createmsg(read_msg);
@@ -356,4 +359,44 @@ void handle_updatetracker_req(int sock_child, updateReq tokens){
 		write(sock_child,msgPeer,strlen(msgPeer));
 		close(sock_child);
 	}
+}
+
+void xtract_fname(const char *msg, char* fname) {
+    int i = 0;
+    while (msg[i+4] != '\0' && msg[i+4] != '\n') { //GET filename.track
+        fname[i] = msg[i+4];
+        i++;
+    }
+    fname[i] = '\0';
+    return;
+}
+
+void handle_get_req(int sock_child, const char* fname) {
+        printf("REP GET BEGIN\n");
+        send(sock_child, "REP GET BEGIN", 14, 0);
+        char buff[256];
+        int n = recv(sock_child, buff, sizeof(buff)-1, 0);
+		buff[n] = '\0';
+        //printf("CONFIRM\n");
+        char flocation[256];
+        sprintf(flocation, "torrents/%s", fname);
+	FILE* fptr = fopen(flocation, "r");
+	if (fptr == NULL) {
+	  printf("FILE FAILED TO OPEN\n");
+	  exit(0);	
+	}
+	char line[MAXLINE];
+	while (fgets(line, MAXLINE, fptr)) { //read file one line at a time
+		//write to socket
+		printf("%s", line);
+		send(sock_child,line,strlen(line), 0);
+		char buff[100];
+		recv(sock_child, buff, 100, 0);
+		//printf("CONFIRM\n");
+	}
+	fclose(fptr);
+	printf("REP GET END md5\n"); //IMPLEMENT AND APPEND FILE MD5
+	send(sock_child, "REP GET END md5", 16, 0);
+	close(sock_child);
+	return;
 }

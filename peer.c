@@ -6,13 +6,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
+#include <arpa/inet.h>
 #include "definitions.h"
 
+void xtract_fname(const char *msg, char* fname); //used with GET
 
 void main(int argc,char *argv[]){
 	
    	char *server_address = "127.0.0.1";
-	int server_port=5000;  // you should instead read from configuration file
+	int server_port=5001;  // you should instead read from configuration file
 
 	// Read server address and port from configuration file
 	FILE *file = fopen("config.txt", "r");
@@ -32,18 +35,23 @@ void main(int argc,char *argv[]){
 	while (strcmp(cmd, "EXIT") != 0){
 		struct sockaddr_in server_addr;
 		int sockid;
-
 		char msg[1024];
 			
 		if ((sockid = socket(AF_INET,SOCK_STREAM,0))==-1){//create socket
 			printf("socket cannot be created\n"); exit(0);
 		}
 												
-	
 		server_addr.sin_family = AF_INET;//host byte order
 		server_addr.sin_port = htons(server_port);// convert to network byte order
+
+		if (inet_pton(AF_INET, server_address, &server_addr.sin_addr) != 1) {
+    		printf("Bad server address\n"); exit(0);
+		}
+
 		if (connect(sockid ,(struct sockaddr *) &server_addr,sizeof(struct sockaddr))==-1){//connect and error check
-			printf("Cannot connect to server\n"); exit(0);
+			printf("Cannot connect to server\n");
+			printf("errno: %i\n", errno);
+			exit(0);
 		}
 
 		/* If connected successfully*/
@@ -80,8 +88,40 @@ void main(int argc,char *argv[]){
 			msg[n] = '\0'; //append null terminator to read message
     		printf("%s\n", msg);
 		}
-		else if(strcmp(cmd, "GET") == 0){
+		else if(strncmp(cmd, "GET", 3) == 0){ //get command
 			//IMPLEMENT GET FUNCTIONALITY HERE
+			send(sockid, cmd, strlen(cmd), 0);
+			int n = recv(sockid, (char*)&msg, sizeof(msg), 0); //REP GET
+			send(sockid, "CONFIRM", 7, 0);
+			msg[n] = '\0';
+			printf("%s\n", msg);
+			char fn[64];
+			xtract_fname(cmd, fn);
+			char flocation[256];
+                        sprintf(flocation, "cache/%s", fn);
+	                FILE* fptr = fopen(flocation, "w");
+	                if (fptr == NULL) {
+                                printf("FILE FAILED TO OPEN");
+                                exit(0);
+                        }
+                        int loop = 1;
+                        while (loop > 0) {
+                            n = recv(sockid, (char *)&msg, sizeof(msg), 0);
+                            msg[n] = '\0';
+                            printf("line %d: %s\n", loop, msg);
+                            char* end = strstr(msg, "REP GET END");
+                            if (end) {
+                              //IMPLEMENT MD5 CHECK HERE
+                              loop = 0;
+                              end[0] = '\0';
+                            }
+                            else {
+                              loop++;
+                            }
+                            fputs(msg, fptr);
+                            send(sockid, "CONFIRM", 7, 0);
+                        }
+                        fclose(fptr);
 		}
 
 		else if(strcmp(cmd, "UPDATETRACKER") == 0){
@@ -104,4 +144,13 @@ void main(int argc,char *argv[]){
 	}
 	exit(0);
 }	     
-  
+
+void xtract_fname(const char *msg, char* fname) {
+    int i = 0;
+    while (msg[i+4] != '\0') { //GET filename.track
+        fname[i] = msg[i+4];
+        i++;
+    }
+    fname[i] = '\0';
+    return;
+}
