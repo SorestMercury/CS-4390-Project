@@ -27,7 +27,8 @@ void main(int argc,char *argv[]){
 	}
 	fclose(file);
    
-    char cmd[128];
+    char cmd[256];
+	char *args[10]; // Array to hold command arguments
 
 	while (strcmp(cmd, "EXIT") != 0){
 		struct sockaddr_in server_addr;
@@ -51,6 +52,13 @@ void main(int argc,char *argv[]){
 		printf("Enter command: ");
 		fgets(cmd, sizeof(cmd), stdin);
 		cmd[strcspn(cmd, "\n")] = 0; // Remove the newline character
+		args[0] = strtok(cmd, " "); // Tokenize the command
+		int i = 1;
+		while ((args[i] = strtok(NULL, " ")) != NULL) {
+			i++;
+		}
+		args[i] = NULL; // Null-terminate the array
+
 		if(strcmp(cmd, "LIST") == 0){
 			const char* list_req="REQ LIST";
 			if((write(sockid,list_req,strlen(list_req))) < 0){//inform the server of the list request
@@ -67,6 +75,13 @@ void main(int argc,char *argv[]){
 		}
 		
 		else if(strcmp(cmd, "CREATETRACKER") == 0){
+			char fileName[256], description[256], md5[33], ip[16];
+			long fileSize;
+			fileName = args[1];
+			description = args[2];
+			md5 = args[3];
+			fileSize = atol(args[4]);
+			ip = args[5];
 			const char* create_req="createtracker movie1.avi 109283519 Ghost_and_the_Darkness,_DVD_Rip c68c2ee8bfca4e898b396e7a935a1d92 202.141.60.10 2097\n";
 			if((write(sockid,create_req,strlen(create_req))) < 0){//inform the server of the create request
 				printf("Send_request  failure\n"); exit(0);
