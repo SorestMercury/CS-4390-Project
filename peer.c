@@ -34,18 +34,21 @@ void main(int argc,char *argv[]){
 	while (strcmp(cmd, "EXIT") != 0){
 		struct sockaddr_in server_addr;
 		int sockid;
-
 		char msg[1024];
 			
 		if ((sockid = socket(AF_INET,SOCK_STREAM,0))==-1){//create socket
 			printf("socket cannot be created\n"); exit(0);
 		}
 												
-	
 		server_addr.sin_family = AF_INET;//host byte order
 		server_addr.sin_port = htons(server_port);// convert to network byte order
 		printf("sip: %s\n", server_address);
 		printf("sport: %i\n", server_port);
+
+		if (inet_pton(AF_INET, server_address, &server_addr.sin_addr) != 1) {
+    		printf("Bad server address\n"); exit(0);
+		}
+
 		if (connect(sockid ,(struct sockaddr *) &server_addr,sizeof(struct sockaddr))==-1){//connect and error check
 			printf("Cannot connect to server\n");
 			printf("errno: %i\n", errno);
@@ -92,10 +95,10 @@ void main(int argc,char *argv[]){
 			read(sockid, (char*)&msg, sizeof(msg)); //REP GET
 			printf("%s\n", msg);
 			char fn[64];
-			//xtract_fname(cmd, fn);
+			xtract_fname(cmd, fn);
 			char flocation[256];
-                        //sprintf(flocation, "/cache/%s", fn);
-	                /*FILE* fptr = fopen(fn, "w");
+                        sprintf(flocation, "/cache/%s", fn);
+	                FILE* fptr = fopen(fn, "w");
 	                if (fptr == NULL) {
                                 printf("FILE FAILED TO OPEN");
                                 exit(0);
@@ -105,12 +108,13 @@ void main(int argc,char *argv[]){
                             read(sockid, (char*)&msg, sizeof(msg));
                             printf("%s\n", msg);
                             if (strncmp(msg, "REP GET END", 11) == 0) {
+								printf("do I ever reach?");
                               //IMPLEMENT MD5 CHECK HERE
                               loop = 0;
                             }
                             fputs(msg, fptr);
                         }
-                        fclose(fptr);*/
+                        fclose(fptr);
 		}
 
 		else if(strcmp(cmd, "UPDATETRACKER") == 0){
