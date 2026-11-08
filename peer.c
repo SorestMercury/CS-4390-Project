@@ -44,6 +44,7 @@ void main(int argc,char *argv[]){
 												
 		server_addr.sin_family = AF_INET;//host byte order
 		server_addr.sin_port = htons(server_port);// convert to network byte order
+		printf("\nConnecting to server at %s:%d\n", server_address, server_port);
 
 		if (inet_pton(AF_INET, server_address, &server_addr.sin_addr) != 1) {
     		printf("Bad server address\n"); exit(0);
@@ -85,12 +86,18 @@ void main(int argc,char *argv[]){
 		else if(strcmp(cmd, "CREATETRACKER") == 0){
 			char fileName[256], description[256], md5[33], ip[16];
 			long fileSize;
-			fileName = args[1];
-			description = args[2];
-			md5 = args[3];
+			if (i < 6) {
+				printf("Error: CREATETRACKER command requires 5 arguments.\n");
+				continue;
+			}
+			strcpy(fileName, args[1]);
+			strcpy(description, args[2]);
+			strcpy(md5, args[3]);
 			fileSize = atol(args[4]);
-			ip = args[5];
-			const char* create_req="createtracker movie1.avi 109283519 Ghost_and_the_Darkness,_DVD_Rip c68c2ee8bfca4e898b396e7a935a1d92 202.141.60.10 2097\n";
+			strcpy(ip, args[5]);
+			char create_req[597]; // 256 + 256 + 33 + 10 + 16 + extra for command and spaces
+			sprintf(create_req, "createtracker %s %s %s %ld %s\n", fileName, description, md5, fileSize, ip);
+			printf("Sending request: %s\n", create_req);
 			if((write(sockid,create_req,strlen(create_req))) < 0){//inform the server of the create request
 				printf("Send_request  failure\n"); exit(0);
 			}
