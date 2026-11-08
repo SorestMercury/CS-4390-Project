@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -6,7 +7,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <errno.h>
-#include <sys/dir.h>
+#include <dirent.h>
 #include <time.h>
 
 const int MAXLINE=1024;
@@ -15,12 +16,13 @@ int server_port=5000;
 socklen_t clilen;
 
 int peer_handler(int sock_child);
+void handle_list_req(int sock_child);
 
 int main(){
 	pid_t pid;
-   struct sockaddr_in server_addr, client_addr;  
+   struct sockaddr_in server_addr, client_addr;
    if ((sockid = socket(AF_INET,SOCK_STREAM,0)) < 0){//create socket connection oriented
-	   printf("socket cannot be created \n"); exit(0); 
+	   printf("socket cannot be created \n"); exit(0);
    }
 
    // Read server port from configuration file
@@ -33,38 +35,38 @@ int main(){
 		}
 	}
 	fclose(file);
-    
+
    //socket created at this stage
    //now associate the socket with local port to allow listening incoming connections
    server_addr.sin_family = AF_INET;// assign address family
    server_addr.sin_port = htons(server_port);//change server port to NETWORK BYTE ORDER
    server_addr.sin_addr.s_addr = htons(INADDR_ANY);
-    
+
    if (bind(sockid ,(struct sockaddr *) &server_addr,sizeof(server_addr)) ==-1){//bind and check error
-	   printf("bind failure\n"); exit(0); 
+	   printf("bind failure\n"); exit(0);
    }
-    
+
    printf("Tracker SERVER READY TO LISTEN INCOMING REQUEST.... \n");
    if (listen(sockid, 0) < 0){ //(parent) process listens at sockid and check error
 	   printf(" Tracker  SERVER CANNOT LISTEN\n"); exit(0);
-   }    
-   clilen = sizeof(client_addr);                                    
-   
+   }
+   clilen = sizeof(client_addr);
+
    while(1) { //accept  connection from every requester client
 	   if ((sock_child = accept(sockid ,(struct sockaddr *) &client_addr,&clilen))==-1){ /* accept connection and create a socket descriptor for actual work */
-		   printf("Tracker Cannot accept...\n"); exit(0); 
+		   printf("Tracker Cannot accept...\n"); exit(0);
 	   }
 
 	   if ((pid=fork())==0){//New child process will serve the requester client. separate child will serve separate client
 		   close(sockid);   //child does not need listener
-		   peer_handler(sock_child);//child is serving the client.		   
+		   peer_handler(sock_child);//child is serving the client.
 		   close (sock_child);// printf("\n 1. closed");
 		   exit(0);         // kill the process. child process all done with work
         }
 	   close(sock_child);  // parent all done with client, only child will communicate with that client from now
-	   
-     }  //accept loop ends            
-} // main fun ends  
+
+     }  //accept loop ends
+} // main fun ends
 
 typedef struct{
 	char fileName[256];
@@ -89,35 +91,33 @@ void handle_createtracker_req(int sock_child, createReq tokens);
 updateReq tokenize_updatemsg(const char* msg);
 void handle_updatetracker_req(int sock_child, updateReq tokens);
 
-int peer_handler(int sock_child){ // function for file transfer. child process will call this function     
-    //start handiling client request	
+int peer_handler(int sock_child){ // function for file transfer. child process will call this function
+    //start handiling client request
 	int length;
 	char read_msg[MAXLINE];
 	char fname[64];
-	length=read(sock_child,read_msg,MAXLINE);			
+	length=read(sock_child,read_msg,MAXLINE);
 	read_msg[length]='\0';
 	if((!strcmp(read_msg, "REQ LIST"))||(!strcmp(read_msg, "REQ LIST\n"))||(!strcmp(read_msg, "req list"))||(!strcmp(read_msg, "<REQ LIST>"))||(!strcmp(read_msg, "<REQ LIST>\n"))){//list command received
-		//handle_list_req(sock_child);// handle list request
-		const char* dummyResponse = "server acknowledges list request";
-		write(sock_child,dummyResponse,strlen(dummyResponse));
+		handle_list_req(sock_child);
 		printf("list request handled.\n");
 	}
 	else if((strstr(read_msg,"get")!=NULL)||(strstr(read_msg,"GET")!=NULL)){// get command received
-		//xtrct_fname(read_msg, " ");// extract filename from the command		
-		//handle_get_req(sock_child, fname);		
+		//xtrct_fname(read_msg, " ");// extract filename from the command
+		//handle_get_req(sock_child, fname);
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
 		createReq tokens = tokenize_createmsg(read_msg);
 		handle_createtracker_req(sock_child, tokens);
 		exit(0);
-		
+
 	}
 	else if((strstr(read_msg,"updatetracker")!=NULL)||(strstr(read_msg,"Updatetracker")!=NULL)||(strstr(read_msg,"UPDATETRACKER")!=NULL)){// get command received
 		updateReq tokens = tokenize_updatemsg(read_msg);
 		handle_updatetracker_req(sock_child, tokens);
-		exit(0);		
+		exit(0);
 	}
-	
+
 }//end client handler function
 
 int file_exists(const char *filename) {
@@ -133,7 +133,7 @@ createReq tokenize_createmsg(const char* msg){
     buf[sizeof(buf) - 1] = '\0';
 
 	char *save; //save pointer for threadsafe strtok
-	
+
 	//split message into tokens
 	char *cmd = strtok_r(buf, " \t\r\n<>",&save);
     char *fn  = strtok_r(NULL, " \t\r\n<>",&save);
@@ -155,13 +155,13 @@ createReq tokenize_createmsg(const char* msg){
 
 	strncpy(request.description,dsc,255);
 	request.description[255] = '\0';
-	
+
 	strncpy(request.md5, md5, 32);
 	request.md5[32] = '\0';
 
 	strncpy(request.ip,ip,15);
 	request.ip[15] = '\0';
-	
+
 	request.port = strtol(prt, NULL, 10);
 
 	return request;
@@ -220,7 +220,7 @@ updateReq tokenize_updatemsg(const char* msg){
     buf[sizeof(buf) - 1] = '\0';
 
 	char *save; //save pointer for threadsafe strtok
-	
+
 	//split message into tokens
 	char *cmd = strtok_r(buf, " \t\r\n<>",&save);
     char *fn  = strtok_r(NULL, " \t\r\n<>",&save);
@@ -242,7 +242,7 @@ updateReq tokenize_updatemsg(const char* msg){
 
 	strncpy(request.ip,ip,15);
 	request.ip[15] = '\0';
-	
+
 	request.port = strtol(prt, NULL, 10);
 
 	return request;
@@ -255,7 +255,7 @@ typedef struct { long start, end; } range;
 static int cmp_start(const void *a, const void *b) {
 			long x = ((const range *)a)->start;
 			long y = ((const range *)b)->start;
-			return (x > y) - (x < y); 
+			return (x > y) - (x < y);
 		}
 
 void handle_updatetracker_req(int sock_child, updateReq tokens){
@@ -282,10 +282,10 @@ void handle_updatetracker_req(int sock_child, updateReq tokens){
 		//create temp path/file to modify instead of modifying original tracker file
 		char tmpPath[512];
 		snprintf(tmpPath, sizeof(tmpPath), "%s.XXXXXX", fileName);
-		int fd = mkstemp(tmpPath);          
+		int fd = mkstemp(tmpPath);
 		if (fd < 0) { perror("mkstemp"); }
 
-		FILE *temp = fdopen(fd, "w");        
+		FILE *temp = fdopen(fd, "w");
 		if (!temp) { perror("fdopen"); close(fd); remove(tmpPath); }
 
 		//create unique ip:port combo to search for in line
@@ -305,11 +305,11 @@ void handle_updatetracker_req(int sock_child, updateReq tokens){
 			}
 
 			else //no key contained in line, write it back to temp file as is
-				fputs(line, temp);                 
+				fputs(line, temp);
 		}
 
 		if(rangen<128) { //add the range from the updatetracker command to the array of ranges
-			ranges[rangen].start = tokens.startByte; 
+			ranges[rangen].start = tokens.startByte;
 			ranges[rangen].end = tokens.endByte;
 			rangen++;
 		}
@@ -337,7 +337,7 @@ void handle_updatetracker_req(int sock_child, updateReq tokens){
 		fprintf(temp, "%s%ld:%ld:%ld\n", key, start, end, now); //write final merged range to file
 		fclose(temp);
 		fclose(file);
-		
+
 		char msgPeer[1024];
 
 		//replace current trackerfile with temp file, notify client of success/fail
@@ -346,8 +346,8 @@ void handle_updatetracker_req(int sock_child, updateReq tokens){
 			remove(tmpPath);
 			snprintf(msgPeer, 1024, "<updatetracker %s fail>", tokens.fileName);
 			printf("%s",msgPeer);
-		} 
-		
+		}
+
 		else {
 			snprintf(msgPeer, 1024, "<updatetracker %s succ>", tokens.fileName);
 		}
@@ -356,4 +356,83 @@ void handle_updatetracker_req(int sock_child, updateReq tokens){
 		write(sock_child,msgPeer,strlen(msgPeer));
 		close(sock_child);
 	}
+}
+void handle_list_req(int sock_child) {
+    DIR *dir; //directory pointer
+    struct dirent *entry; // entry pointer
+    FILE *file;// file pointer
+
+    char path[512]; //store path to file
+    char line [512]; //store line read from file
+    char response[MAXLINE]; //store response for peer
+
+    int used = 0; //characters written to response buffer
+    int found = 0; //flag file found
+    response[0] = '\0'; //empty response string
+
+    dir = opendir("torrents"); //open torrents directory
+    //validate if directory is accessible, send error to peer
+    if (dir == NULL) {
+        snprintf(response, sizeof(response), "No tracker directory found.\n");
+        write(sock_child, response, strlen(response));
+        return;
+    }
+
+    used = snprintf(response, sizeof(response), "Available files:\n"); //add response heading
+
+    while ((entry = readdir(dir)) != NULL) {// read each entry of directory
+        int name_len = strlen(entry->d_name); //current file length
+        if (name_len < 6 || strcmp(entry->d_name + name_len - 6, ".track") != 0) { //validate length
+            continue;  //skip files without metadata
+        }
+        //build metadata file path
+        snprintf(path, sizeof(path), "torrents/%s", entry->d_name);
+        //open metadata file to read
+        file = fopen(path, "r");
+        //skip files that cannot be opened
+        if (file == NULL) {
+            continue;
+        }
+        //successfull metadata file
+        found = 1;
+
+        //read 3 lines for filename, filesize, and description
+        for (int i = 0; i < 3; i++) {
+            if (fgets(line, sizeof(line), file) == NULL) {
+                break;  //stop at end of lines
+            }
+            //check for space in response buffer
+            if (used < (int)sizeof(response) - 1) {
+                int remaining = (int)sizeof(response) - used; //append line to response
+                int written = snprintf(response + used, remaining, "%s", line);
+                //update characters used
+                if (written < 0) {
+                    break;
+                }
+                //ensure not exceeding buffer size
+                if (written >= remaining) {
+                    used = sizeof(response) - 1;
+                    break;
+                }
+                used += written;
+            }
+        }
+
+        //separate file entries with a newline
+        if (used < (int)sizeof(response) - 1) {
+            int remaining = (int)sizeof(response) - used;
+            int written = snprintf(response + used, remaining, "\n");
+            if (written > 0 && written < remaining) {
+                used += written;
+            }
+        }
+        fclose(file);
+    } //close file and directory when done
+    closedir(dir);
+    // alert peer if no file found
+    if (!found) {
+        snprintf(response, sizeof(response), "No files are currently registered.\n");
+    }
+    // send information to peer
+    write(sock_child, response, strlen(response));
 }
