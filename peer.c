@@ -23,9 +23,9 @@ void main(int argc,char *argv[]){
 	while (fgets(buffer, sizeof(buffer), file) != NULL){
 		char *linearg = strtok(buffer, " ");
 		if (strcmp(linearg, "server_ip") == 0) {
-			server_address = strdup(strtok(NULL, " \n"));
+			server_address = strdup(strtok(NULL, " \r\n"));
 		} else if (strcmp(linearg, "server_port") == 0) {
-			server_port = atoi(strdup(strtok(NULL, " \n")));
+			server_port = atoi(strdup(strtok(NULL, " \r\n")));
 		}
 	}
 	fclose(file);
