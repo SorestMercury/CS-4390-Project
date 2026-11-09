@@ -5,30 +5,38 @@ To do:
 
 * Implement 7 functions in the tracker
 
-  * handle\_list\_req
   * xtrct\_fname
   * tokenize\_createmsg- Dylan
   * tokenize\_updatemsg- Dylan
-  * handle\_createtracker\_req - Dylan
-  * handle\_updatetracker\_req - Dylan
-* User input and output
-* Stop program
-* Peer
+  
 
-  * create tracker- Archer
-  * update tracker- Archer
-  * REQ LIST- Christopher
-  * GET- Christopher
+* Peer
 
 In progress:
 
-* tracker.c
-* messages
+* Peer Downloading
 
 Completed:
 
 * Download and upload C files
 * declared previously undeclared headers
+
+* Peer
+
+  * create tracker- Archer
+  * update tracker- Archer
+  * User input and output - Archer
+  * Stop program - Archer
+  * REQ LIST- Christopher
+  * GET- Christopher
+
+* Tracker
+
+  * handle\_list\_req
+  * handle\_createtracker\_req - Dylan
+  * handle\_updatetracker\_req - Dylan
+
+* messages
 
 Work Log:
 
