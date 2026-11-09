@@ -24,11 +24,11 @@ int main(){
    }
 
    // Read server port from configuration file
-	FILE *file = fopen("config.txt", "r");
+	FILE *file = fopen("sconfig.cfg", "r");
 	char buffer[256];
 	while (fgets(buffer, sizeof(buffer), file) != NULL){
 		char *linearg = strtok(buffer, " ");
-		if(strcmp(linearg, "server_port") == 0) {
+		if(strcmp(linearg, "PORT") == 0) {
 			server_port = atoi(strdup(strtok(NULL, " \n")));
 		}
 	}
@@ -100,7 +100,7 @@ int peer_handler(int sock_child){ // function for file transfer. child process w
 	read_msg[length]='\0';
 	if((!strcmp(read_msg, "REQ LIST"))||(!strcmp(read_msg, "REQ LIST\n"))||(!strcmp(read_msg, "req list"))||(!strcmp(read_msg, "<REQ LIST>"))||(!strcmp(read_msg, "<REQ LIST>\n"))){//list command received
 		//handle_list_req(sock_child);// handle list request
-		const char* dummyResponse = "server acknowledges list request";
+		const char* dummyResponse = "server acknowledges list request\n";
 		write(sock_child,dummyResponse,strlen(dummyResponse));
 		printf("list request handled.\n");
 	}
@@ -200,7 +200,7 @@ void handle_createtracker_req(int sock_child, createReq tokens){
 
 		//inform client of success
 		const char* msgPeer = "<createtracker succ>";
-		printf("%s",msgPeer);
+		printf("%s\n",msgPeer);
 		write(sock_child,msgPeer,strlen(msgPeer));
 		close(sock_child);
 	}
@@ -208,7 +208,7 @@ void handle_createtracker_req(int sock_child, createReq tokens){
 	//inform client of failure
 	else{
 		const char* msgPeer = "<createtracker ferr>";
-		printf("%s",msgPeer);
+		printf("%s\n",msgPeer);
 		write(sock_child,msgPeer,strlen(msgPeer));
 		close(sock_child);
 	}
