@@ -15,8 +15,8 @@ To do:
 * Stop program
 * Peer
 
-  * create tracker- Dylan
-  * update tracker- Dylan
+  * create tracker- Archer
+  * update tracker- Archer
   * REQ LIST- Christopher
   * GET- Christopher
 
