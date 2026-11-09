@@ -99,9 +99,7 @@ int peer_handler(int sock_child){ // function for file transfer. child process w
 	length=read(sock_child,read_msg,MAXLINE);			
 	read_msg[length]='\0';
 	if((!strcmp(read_msg, "REQ LIST"))||(!strcmp(read_msg, "REQ LIST\n"))||(!strcmp(read_msg, "req list"))||(!strcmp(read_msg, "<REQ LIST>"))||(!strcmp(read_msg, "<REQ LIST>\n"))){//list command received
-		//handle_list_req(sock_child);// handle list request
-		const char* dummyResponse = "server acknowledges list request\n";
-		write(sock_child,dummyResponse,strlen(dummyResponse));
+		handle_list_req(sock_child);
 		printf("list request handled.\n");
 	}
 	else if((strstr(read_msg,"get")!=NULL)||(strstr(read_msg,"GET")!=NULL)){// get command received
@@ -399,4 +397,84 @@ void handle_get_req(int sock_child, const char* fname) {
 	send(sock_child, "REP GET END md5", 16, 0);
 	close(sock_child);
 	return;
+}
+
+void handle_list_req(int sock_child) {
+    DIR *dir; //directory pointer
+    struct dirent *entry; // entry pointer
+    FILE *file;// file pointer
+
+    char path[512]; //store path to file
+    char line [512]; //store line read from file
+    char response[MAXLINE]; //store response for peer
+
+    int used = 0; //characters written to response buffer
+    int found = 0; //flag file found
+    response[0] = '\0'; //empty response string
+
+    dir = opendir("torrents"); //open torrents directory
+    //validate if directory is accessible, send error to peer
+    if (dir == NULL) {
+        snprintf(response, sizeof(response), "No tracker directory found.\n");
+        write(sock_child, response, strlen(response));
+        return;
+    }
+
+    used = snprintf(response, sizeof(response), "Available files:\n"); //add response heading
+
+    while ((entry = readdir(dir)) != NULL) {// read each entry of directory
+        int name_len = strlen(entry->d_name); //current file length
+        if (name_len < 6 || strcmp(entry->d_name + name_len - 6, ".track") != 0) { //validate length
+            continue;  //skip files without metadata
+        }
+        //build metadata file path
+        snprintf(path, sizeof(path), "torrents/%s", entry->d_name);
+        //open metadata file to read
+        file = fopen(path, "r");
+        //skip files that cannot be opened
+        if (file == NULL) {
+            continue;
+        }
+        //successfull metadata file
+        found = 1;
+
+        //read 3 lines for filename, filesize, and description
+        for (int i = 0; i < 3; i++) {
+            if (fgets(line, sizeof(line), file) == NULL) {
+                break;  //stop at end of lines
+            }
+            //check for space in response buffer
+            if (used < (int)sizeof(response) - 1) {
+                int remaining = (int)sizeof(response) - used; //append line to response
+                int written = snprintf(response + used, remaining, "%s", line);
+                //update characters used
+                if (written < 0) {
+                    break;
+                }
+                //ensure not exceeding buffer size
+                if (written >= remaining) {
+                    used = sizeof(response) - 1;
+                    break;
+                }
+                used += written;
+            }
+        }
+
+        //separate file entries with a newline
+        if (used < (int)sizeof(response) - 1) {
+            int remaining = (int)sizeof(response) - used;
+            int written = snprintf(response + used, remaining, "\n");
+            if (written > 0 && written < remaining) {
+                used += written;
+            }
+        }
+        fclose(file);
+    } //close file and directory when done
+    closedir(dir);
+    // alert peer if no file found
+    if (!found) {
+        snprintf(response, sizeof(response), "No files are currently registered.\n");
+    }
+    // send information to peer
+    write(sock_child, response, strlen(response));
 }
