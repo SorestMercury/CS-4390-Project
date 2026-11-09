@@ -12,6 +12,7 @@
 #include <netdb.h>
 #include <sys/wait.h>
 #include <dirent.h>
+#include <signal.h>
 #include "definitions.h"
 
 void xtract_fname(const char *msg, char* fname); //used with GET
@@ -19,6 +20,12 @@ char *calculate_md5(const char *filename); //used with CREATETRACKER
 char *get_local_ip(); //used with CREATETRACKER and UPDATETRACKER
 void alarm_handler(int sig); //used with UPDATETRACKER
 void updateTracker(const char *filename);
+void host_file(const char *filename, int port);
+static int fetch_segment(const char *ip, int port, const char *name,
+                         long start, long end, FILE *out);
+static void handle_peer(int connfd, const char *filename);
+static int write_all(int fd, const char *buf, size_t len);
+static int read_line(int fd, char *buf, size_t max);
 volatile sig_atomic_t sockid;
 volatile sig_atomic_t server_port;
 
@@ -221,11 +228,187 @@ void main(int argc,char *argv[]){
     		printf("%s\n", msg);
 		}
 
+		else if (strcmp(args[0], "DOWNLOAD") == 0) {
+			if (i < 6) {
+				printf("Usage: DOWNLOAD <ip> <port> <filename> <start> <end>\n");
+				continue;
+			}
+
+			char *ip = args[1];
+			int port = atoi(args[2]);
+			char *name = args[3];
+			long start = atol(args[4]);
+			long end = atol(args[5]);
+
+			char outpath[300];
+			snprintf(outpath, sizeof(outpath), "media/%s", name);
+
+			FILE *out = fopen(outpath, "r+b");
+			if (out == NULL) out = fopen(outpath, "w+b");
+			if (out == NULL) {
+				printf("Error: cannot open %s\n", outpath);
+				continue;
+			}
+
+			if (fetch_segment(ip, port, name, start, end, out) == 0)
+				printf("Got bytes %ld-%ld into %s\n", start, end, outpath);
+			else
+				printf("fetch_segment failed\n");
+
+			fclose(out);
+		}
+
+		else if (strcmp(args[0], "HOST") == 0 && i >= 3) {
+			host_file(args[1], atoi(args[2]));
+		}
+
 		close(sockid);
 		//printf("Connection closed\n");
 	}
 	exit(0);
 }	     
+
+void host_file(const char *filename, int port) {
+	pid_t pid = fork();
+	if (pid < 0) {
+		perror("fork");
+		return;
+	}
+	if (pid > 0) {
+		printf("Hosting %s on port %d (pid %d)\n", filename, port, pid);
+		return;
+	}
+
+	//child
+	signal(SIGCHLD, SIG_IGN); //auto-reap per-connection handlers, no zombies
+
+	int listenfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (listenfd == -1) {
+		perror("socket");
+		exit(1);
+	}
+
+	int opt = 1;
+	setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+	struct sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	addr.sin_port = htons(port);
+
+	if (bind(listenfd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+		perror("bind");
+		exit(1);
+	}
+	if (listen(listenfd, 10) == -1) {
+		perror("listen");
+		exit(1);
+	}
+
+	while (1) {
+		struct sockaddr_in cli;
+		socklen_t clilen = sizeof(cli);
+		int connfd = accept(listenfd, (struct sockaddr *)&cli, &clilen);
+		if (connfd == -1) {
+			if (errno == EINTR) continue;
+			perror("accept");
+			continue;
+		}
+
+		if (fork() == 0) {
+			close(listenfd);
+			handle_peer(connfd, filename);
+			close(connfd);
+			exit(0);
+		}
+		close(connfd);
+	}
+}
+
+static void handle_peer(int connfd, const char *filename) {
+	char req[512], reqName[256];
+	long start, end;
+
+	if (read_line(connfd, req, sizeof(req)) <= 0) return;
+
+	if (sscanf(req, "SEND %255s %ld %ld", reqName, &start, &end) != 3) {
+		write_all(connfd, "ERROR bad request\n", 18);
+		return;
+	}
+	if (strcmp(reqName, filename) != 0) {
+		write_all(connfd, "ERROR unknown file\n", 19);
+		return;
+	}
+
+	FILE *fp = fopen(filename, "rb");
+	if (fp == NULL) {
+		write_all(connfd, "ERROR cannot open file\n", 23);
+		return;
+	}
+
+	fseek(fp, 0, SEEK_END);
+	long fileSize = ftell(fp);
+	if (start < 0 || end > fileSize || start >= end) {
+		write_all(connfd, "ERROR bad range\n", 16);
+		fclose(fp);
+		return;
+	}
+
+	fseek(fp, start, SEEK_SET);
+	char buf[1024];
+	long remaining = end - start;
+	while (remaining > 0) {
+		size_t want = remaining < (long)sizeof(buf) ? remaining : sizeof(buf);
+		size_t got = fread(buf, 1, want, fp);
+		if (got == 0) break;
+		if (write_all(connfd, buf, got) < 0) break;
+		remaining -= got;
+	}
+	fclose(fp);
+}
+
+static int fetch_segment(const char *ip, int port, const char *name,
+                         long start, long end, FILE *out) {
+	int fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (fd == -1) return -1;
+
+	struct sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+	if (inet_pton(AF_INET, ip, &addr.sin_addr) != 1 ||
+	    connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+		close(fd);
+		return -1;
+	}
+
+	char req[512];
+	snprintf(req, sizeof(req), "SEND %s %ld %ld\n", name, start, end);
+	if (write_all(fd, req, strlen(req)) < 0) { close(fd); return -1; }
+
+	fseek(out, start, SEEK_SET);
+	long remaining = end - start;
+	char buf[1024];
+	int first = 1;
+
+	while (remaining > 0) {
+		size_t want = remaining < (long)sizeof(buf) ? remaining : sizeof(buf);
+		ssize_t n = read(fd, buf, want);
+		if (n <= 0) { close(fd); return -1; }          //peer closed early or error
+		if (first && n >= 5 && strncmp(buf, "ERROR", 5) == 0) {
+			close(fd);
+			return -1;                                  //host rejected the request
+		}
+		first = 0;
+		fwrite(buf, 1, n, out);
+		remaining -= n;
+	}
+
+	fflush(out);
+	close(fd);
+	return 0;
+}
 
 void xtract_fname(const char *msg, char* fname) {
     int i = 0;
@@ -371,4 +554,32 @@ void updateTracker(const char *filename) {
 
 	msg[n] = '\0'; //append null terminator to read message
     printf("%s\n", msg);
+}
+
+//write() can send fewer bytes than asked, so loop until done
+static int write_all(int fd, const char *buf, size_t len) {
+	size_t sent = 0;
+	while (sent < len) {
+		ssize_t n = write(fd, buf + sent, len - sent);
+		if (n < 0) {
+			if (errno == EINTR) continue;
+			return -1;
+		}
+		sent += n;
+	}
+	return 0;
+}
+
+//read until /n
+static int read_line(int fd, char *buf, size_t max) {
+	size_t i = 0;
+	while (i < max - 1) {
+		char c;
+		ssize_t n = read(fd, &c, 1);
+		if (n <= 0) return (i == 0) ? -1 : (int)i;
+		if (c == '\n') break;
+		buf[i++] = c;
+	}
+	buf[i] = '\0';
+	return (int)i;
 }
