@@ -29,7 +29,7 @@ void main(int argc,char *argv[]){
 	int update_interval=900; // 15 minutes in seconds
 	char shared_folder[256] = "./torrents";
 	alarm(update_interval);
-	signal(SIGALRM, alarm_handler); // Set up the signal handler for the automatic updateTracker function
+	//signal(SIGALRM, alarm_handler); //signal isnt working right now
 	
 
 	// Read server address and port from configuration file
