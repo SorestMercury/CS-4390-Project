@@ -90,6 +90,7 @@ updateReq tokenize_updatemsg(const char* msg);
 void handle_updatetracker_req(int sock_child, updateReq tokens);
 void xtract_fname(const char *msg, char* fname);
 void handle_get_req(int sock_child, const char* fname);
+void handle_list_req(int sock_child);
 
 int peer_handler(int sock_child){ // function for file transfer. child process will call this function     
     //start handiling client request	
