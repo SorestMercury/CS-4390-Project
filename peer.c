@@ -159,7 +159,6 @@ void main(int argc,char *argv[]){
 		}
 		
 		else if(strncmp(args[0], "GET", 3) == 0){ //get command
-			//IMPLEMENT GET FUNCTIONALITY HERE
 			printf("%s",cmd);
 			send(sockid, cmd, strlen(cmd), 0);
 			int n = recv(sockid, (char*)&msg, sizeof(msg), 0); //REP GET
@@ -173,15 +172,48 @@ void main(int argc,char *argv[]){
                                 printf("FILE FAILED TO OPEN\n");
                                 exit(0);
                         }
+                        int to_delete = 0; //if md5 mismatch
+                        
                         int loop = 1;
                         while (loop > 0) {
                             n = recv(sockid, (char *)&msg, sizeof(msg), 0);
                             msg[n] = '\0';
                             printf("line %d: %s\n", loop, msg);
+                            //"Md5:         %s\n"
+                            char found_md5[1090];
+                            char* is_md5 = strstr(msg, "Md5:");
+                            if (is_md5) {
+                              //parse out the md5 into found_md5
+                              strcpy(found_md5, is_md5);
+                              //replace newline with null terminator
+                              char* find_newline = strstr(found_md5, "\n");
+                              find_newline[0] = '\0';
+                            }
+                            
                             char* end = strstr(msg, "REP GET END");
                             if (end) {
-                              //IMPLEMENT MD5 CHECK HERE
                               loop = 0;
+                              //end[0] = '\0';
+                              char received_md5[1090];
+                              //parse out the md5 into received_md5
+                              strcpy(received_md5, end);
+                              //replace newline with null terminator
+                              char* find_newline = strstr(received_md5, "\n");
+                              find_newline[0] = '\0';
+                              //md5 starts at the 13th character
+                              char* r = received_md5;
+                              r += 12;
+                              //md5 starts at the 14th character
+                              char* f = found_md5;
+                              f += 13;
+                              //compare md5
+                              if (strcmp(r, f) == 0) {
+                                printf("MD5 checksum confirmed\n");
+                              }
+                              else {
+                                printf("MD5 mismatch\n");
+                                to_delete = 1;
+                              }
                               end[0] = '\0';
                             }
                             else {
@@ -191,6 +223,9 @@ void main(int argc,char *argv[]){
                             send(sockid, "CONFIRM", 7, 0);
                         }
                         fclose(fptr);
+                        if (to_delete == 1) {
+                          remove(flocation);
+                        }
 		}
 
 		else if(strcmp(args[0], "UPDATETRACKER") == 0){

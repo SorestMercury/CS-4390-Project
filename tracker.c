@@ -384,18 +384,37 @@ void handle_get_req(int sock_child, const char* fname) {
 	  printf("FILE FAILED TO OPEN\n");
 	  exit(0);	
 	}
+	char found_md5[256];
+	char* f;
 	char line[MAXLINE];
 	while (fgets(line, MAXLINE, fptr)) { //read file one line at a time
 		//write to socket
 		printf("%s", line);
 		send(sock_child,line,strlen(line), 0);
+
+                //check for the md5
+                char* is_md5 = strstr(line, "Md5:");
+                if (is_md5) {
+                  //parse out the md5 into found_md5
+                  strcpy(found_md5, is_md5);
+                  //replace newline with null terminator
+                  char* find_newline = strstr(found_md5, "\n");
+                  find_newline[0] = '\0';
+                  //md5 starts at the 14th character
+                  f = found_md5;
+                  f += 13;
+                }
+                
+		//wait for confirmation
 		char buff[100];
 		recv(sock_child, buff, 100, 0);
 		//printf("CONFIRM\n");
 	}
 	fclose(fptr);
-	printf("REP GET END md5\n"); //IMPLEMENT AND APPEND FILE MD5
-	send(sock_child, "REP GET END md5", 16, 0);
+	char final_message[1024];
+	sprintf(final_message, "REP GET END %s\n", f);
+	printf("%s", final_message);
+	send(sock_child, final_message, strlen(final_message), 0);
 	close(sock_child);
 	return;
 }
